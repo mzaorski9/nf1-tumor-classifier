@@ -1,6 +1,6 @@
 
 from src.data_loader import load_data, load_models, load_thresholds, load_y_probs
-from src.model import get_features_importance
+from src.model import get_features_importance, generate_roc_cv_fold_plot
 import streamlit as st
 from sklearn.metrics import (
     classification_report,
@@ -8,8 +8,9 @@ from sklearn.metrics import (
     RocCurveDisplay,
     PrecisionRecallDisplay,
     confusion_matrix,
-    precision_recall_curve
+    precision_recall_curve,
 )
+from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -20,7 +21,7 @@ import seaborn as sns
 models     = load_models()      # dict
 y_probs    = load_y_probs()
 thresholds = load_thresholds()  # dict
-_, y_te, _, _       = load_data()
+X_te, y_te, X_tr, y_tr      = load_data()
 
 
 feature_names = [
@@ -47,7 +48,7 @@ def make_markdown_table(df):
 
 
 
-st.subheader("🔬 Models Analysis")
+st.subheader("Models Analysis")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -110,8 +111,8 @@ with comp_col1:
     ax_roc.plot([0,1], [0,1], 'k--', label='Random baseline')
     ax_roc.set_title('ROC Curves — All Models')
     ax_roc.legend(loc='lower right')
-    ax_roc.set_ylabel("True Positives")
-    ax_roc.set_xlabel("False Positives")
+    ax_roc.set_ylabel("True Positive Rate")
+    ax_roc.set_xlabel("False Positive Rate")
     st.pyplot(fig_roc)
     plt.close(fig_roc)
 
@@ -270,26 +271,64 @@ with tab2:
 with tab3:
     st.markdown("##### Features importance analysis")
 
-    for name, model in models.items():
-        fig_feat, ax_feat = plt.subplots(figsize=(10, 6))
-        importance_df = get_features_importance(model, feature_names)
+    model_key = inv_names[model_choice]
+    model = models[inv_names[model_choice]]
+    importance_df = get_features_importance(model, feature_names)
+    fig_feat, ax_feat = plt.subplots(figsize=(10, 6))
 
-        if name == 'lr':
-            colors = ['steelblue' if s > 0 else 'tomato' for s in importance_df['Importance']]
-            xlabel = 'Log-Odds Coefficient (+ Risk / - Protective)'
-        else:
-            colors = 'steelblue'
-            xlabel = 'Gain' if name == 'xgb' else 'Log loss'
+    if model_choice == "Logistic Regression":
+        colors = ['steelblue' if s > 0 else 'tomato' for s in importance_df['Importance']]
+        xlabel = 'Log-Odds Coefficient (+ Risk / - Protective)'
+        ax_feat.axvline(0, color='black', linestyle='--', linewidth=0.8)
+    else:
+        colors = 'steelblue'
+        xlabel = 'Gain' if model_key == 'xgb' else 'Log loss'
+        
+    importance_df.plot(kind='barh', x='Feature', y='Importance',
+                        ax=ax_feat, color=colors, legend=False)
+    ax_feat.set_title(f'{model_choice} Feature Importance')
+    ax_feat.set_xlabel(xlabel)
 
-        importance_df.plot(kind='barh', x='Feature', y='Importance',
-                            ax=ax_feat, color=colors, legend=False)
-        ax_feat.set_title(f'{mapped_names[name]} Feature Importance')
-        ax_feat.set_xlabel(xlabel)
+    ax_feat.invert_yaxis()
+    plt.tight_layout()
+    st.pyplot(fig_feat)
+    plt.close(fig_feat)
 
-        if name == 'lr':
-            ax_feat.axvline(0, color='black', linestyle='--', linewidth=0.8)
+# CV results
+with tab4:
+    st.markdown("##### ROC per fold chart")
 
-        ax_feat.invert_yaxis()
-        plt.tight_layout()
-        st.pyplot(fig_feat)
-        plt.close(fig_feat)
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    model = models[inv_names[model_choice]]
+
+    # generate and display ROC fold plot dynamically per selected model
+    roc_fold_fig, fold_df, fold_summary = generate_roc_cv_fold_plot(
+        estimator=model,
+        cv=cv,
+        X=X_tr,
+        y=y_tr,
+        model_name=model_choice
+    )
+
+    st.pyplot(roc_fold_fig)
+    plt.close(roc_fold_fig)
+    
+    st.markdown("---")
+
+
+    st.markdown("##### Mean ± Std Summary")
+
+    fold_col1, fold_col2 = st.columns(2)
+    fold_col1.metric("Mean AUC", f"{fold_summary['mean_auc']:.3f} ± {fold_summary['std_auc']:.3f}")
+    fold_col2.metric("Mean Recall", f"{fold_summary['mean_recall']:.3f} ± {fold_summary['std_recall']:.3f}")  
+
+    st.markdown("---")
+
+    st.markdown("##### Fold Scores Table")
+
+    st.dataframe(
+        fold_df.style.format({"AUC": "{:.3f}", "Recall": "{:.3f}"}),
+        hide_index=True
+    )
+
+

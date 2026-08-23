@@ -1,9 +1,11 @@
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, RocCurveDisplay, auc, recall_score
 from sklearn.pipeline import Pipeline
+from sklearn.base import clone
 import pandas as pd
 import numpy as np
 from .enums import RiskLevel
 from shap import Explanation
+import matplotlib.pyplot as plt
 
 
 ''' Model-related features '''
@@ -366,3 +368,109 @@ def get_features_importance(
         by='Importance',
         ascending=False
     ).reset_index(drop=True)
+
+
+def generate_roc_cv_fold_plot(estimator, 
+                              cv, 
+                              X, 
+                              y, 
+                              threshold: float = 0.5, 
+                              model_name: str = "Model"
+) -> tuple[plt.Figure, pd.DataFrame, dict[str, float]]:
+    """
+    Generates an ROC curve per CV fold alongside a fold scores table and summary statistics.
+    
+    Parameters:
+    - estimator: Tuned Pipeline or model object (or fitted GridSearchCV).
+    - cv: Cross-validation splitter object (e.g., StratifiedKFold).
+    - X, y: Features and target (Pandas DataFrame/Series or NumPy arrays).
+    - threshold (float): Decision threshold for binary classification predictions.
+    - model_name (str): Name of the model to display in the plot title.
+
+    Returns:
+    - fig (plt.Figure): Matplotlib figure of the ROC curves.
+    - scores_fold_df (pd.DataFrame): DataFrame containing per-fold AUC and Recall scores.
+    - summary (dict): Dictionary containing mean and std for AUC and Recall.
+    """
+    # Handle both GridSearchCV objects and standard Pipeline/Estimator objects
+    if hasattr(estimator, "best_estimator_"):
+        base_model = estimator.best_estimator_
+    else:
+        base_model = estimator
+
+
+    # Convert to numpy arrays if necessary to support generic slicing
+    X_arr = X.to_numpy() if hasattr(X, "to_numpy") else X
+    y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    mean_fpr = np.linspace(0, 1, 100)
+    tprs, aucs, recalls = [], [], []
+    fold_scores = []
+
+    # re-run the 5 folds manually on the BEST model configuration to plot the lines;
+    # treat it as 5 separate datasets;
+    # NOTE: GridSearchCV do the same loop under the hood with cv.split(X_train2, y_train2)
+    for fold, (train_idx, test_idx) in enumerate(cv.split(X_arr, y_arr)):
+        # resets weights with each loop       
+        init_model = clone(base_model)
+        X_fold_train, X_fold_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_fold_train, y_fold_test = y.iloc[train_idx], y.iloc[test_idx]
+        
+        # fit (search for weights) and plot curve for this fold
+        init_model.fit(X_fold_train, y_fold_train)
+
+        viz = RocCurveDisplay.from_estimator(
+            init_model, X_fold_test, y_fold_test,
+            name=f"ROC fold {fold}", alpha=0.3, lw=1, ax=ax
+        )
+        
+        # FPR/TPR array sizes can differ between folds because they depend on
+        # the number of unique prediction scores (thresholds) produced by predict_proba();
+        # intepr() interpolates values according to np.linspace(0, 1, 100) and produces 5 arrays of the same size
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr) 
+        aucs.append(viz.roc_auc)
+
+        y_prob_fold = init_model.predict_proba(X_fold_test)[:, 1]
+        y_pred_fold = (y_prob_fold >= threshold).astype(int)
+        recall_fold = recall_score(y_fold_test, y_pred_fold)
+        recalls.append(recall_fold)
+
+        fold_scores.append({
+            "Fold": f"Fold {fold}",
+            "AUC": viz.roc_auc,
+            "Recall": recall_fold
+        })
+
+    # add the Mean ROC line
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+
+    # AUC for the mean ROC
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+
+    ax.plot(
+        mean_fpr, mean_tpr, color="b",
+        label=f"Mean ROC (AUC = {mean_auc:.2f} $\pm$ {std_auc:.2f})", lw=2, alpha=0.8
+    )
+
+    ax.plot([0, 1], [0, 1], "r--", label="Chance")
+    ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05], title=f"ROC per Fold (Best {model_name} Model)")
+    ax.legend(loc="lower right")
+
+    # generate dataframe of scores per fold
+    scores_fold_df = pd.DataFrame(fold_scores)
+
+    # summary dict (means)
+    summary = {
+        "mean_auc": np.mean(aucs),
+        "mean_recall": np.mean(recalls),
+        "std_auc": np.std(aucs),
+        "std_recall": np.std(recalls)
+    }
+
+    return (fig, scores_fold_df, summary)
+

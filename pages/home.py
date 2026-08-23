@@ -40,7 +40,7 @@ with col3:
 st.markdown("---")
 
 st.warning("""
-⚠️ **Disclaimer:** This tool is built for educational and portfolio 
+**Disclaimer:** This tool is built for educational and portfolio 
 purposes only. It is **not** a diagnostic tool and must not be used 
 for real clinical decision-making. Always consult a qualified 
 medical professional.
