@@ -41,7 +41,7 @@ def make_markdown_table(df):
         for col in df.columns:
             val = f"{row[col]:.3f}"
             if row[col] == df[col].max():
-                val = f"**{val} ✅**"
+                val = f"{val}"
             cells.append(val)
         rows.append(f"| {idx} | " + " | ".join(cells) + " |")
     return '\n'.join([header, separator] + rows)

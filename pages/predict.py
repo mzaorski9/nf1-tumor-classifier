@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from src.data_loader import load_models, load_thresholds, load_scaler,  load_data
+from src.data_loader import load_models, load_thresholds, load_preprocessor,  load_data
 from src.model import predict_with_threshold, get_risk_level, generate_result_comment, get_pred_contributors
 from src.explainability import get_shap_values, plot_waterfall
 
@@ -8,12 +8,11 @@ from src.explainability import get_shap_values, plot_waterfall
 
 models = load_models()
 thresholds = load_thresholds()
-scaler = load_scaler()
-data = load_data()
+preprocessor = load_preprocessor()
+X_te, y_te, X_tr, y_tr = load_data()
 
 
 if 'role' not in st.session_state: 
-
     st.session_state.role = 'clinical'
 
 # CLINICAL VIEW 
@@ -96,7 +95,7 @@ if st.session_state.role == 'clinical':
                 # models are pipelines, as we dumped them this way
                 pipeline = models['lr']
                 threshold = thresholds['lr']
-
+                scaler = preprocessor
                 y_pred, y_prob = predict_with_threshold(patient_data, pipeline, threshold)
                 pred_warn_lvl = get_risk_level(y_prob, threshold)
 
@@ -107,7 +106,6 @@ if st.session_state.role == 'clinical':
 
             st.divider()
             col1, col2, col3 = st.columns([2, 1, 1])
-
             # get (single) element from the 'y_prob' array and convert to Python scalar
             risk = y_prob.item() if hasattr(y_pred, 'item') else float(y_prob[0])
             
@@ -118,13 +116,12 @@ if st.session_state.role == 'clinical':
                 st.markdown(f"<p style='color: orange; font-size: 2rem; margin: 0;'>{risk*100:.1f}%</p>", unsafe_allow_html=True)
             
             st.divider()
-
-            model = pipeline.named_steps['model']
-            background_data = data[2]       # X_train
   
-            shap_vals = get_shap_values(model, scaler, patient_data, "Linear", background_data)
+            model = pipeline.named_steps['model']
+    
+            # X_tr as background data (standard ml approach)
+            shap_vals = get_shap_values(model, patient_data, "Linear", scaler, X_te)
             fig = plot_waterfall(shap_values=shap_vals, title="Symptoms relevance", clinical_mode=True)
-
             st.pyplot(fig)
             st.divider()
 

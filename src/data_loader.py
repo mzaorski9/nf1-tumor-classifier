@@ -18,20 +18,17 @@ def download_from_hf(repo_id: str, filename: str) -> str:
 @st.cache_resource
 def load_models() -> dict[str, Any]:
     """Load the trained RF, LR, and XGB models from disk."""
-    model_rf = joblib.load(download_from_hf(REPO_ID, 'model_rf.pkl'))
-    model_lr = joblib.load(download_from_hf(REPO_ID, 'model_lr.pkl'))
-    model_xgb = joblib.load(download_from_hf(REPO_ID, 'model_xgb.pkl'))
-
     return {
-        'rf': model_rf,
-        'lr': model_lr,
-        'xgb': model_xgb
+        'rf': joblib.load(download_from_hf(REPO_ID, 'model_rf.pkl')),
+        'lr': joblib.load(download_from_hf(REPO_ID, 'model_lr.pkl')),
+        'xgb': joblib.load(download_from_hf(REPO_ID, 'model_xgb.pkl'))
     }
 
 @st.cache_resource
-def load_scaler() -> StandardScaler:
-    """Load the fitted scaler (LR only - not needed for the rest of the models)."""
-    return joblib.load(download_from_hf(REPO_ID, 'scaler_lr.pkl'))
+def load_preprocessor() -> StandardScaler:
+    """Load the fitted preprocessor scaler for Linear Regression model """
+    return joblib.load(download_from_hf(REPO_ID, 'preprocessor_lr.pkl'))
+      
 
 @st.cache_data
 def load_thresholds() -> dict:
