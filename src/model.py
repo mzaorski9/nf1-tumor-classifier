@@ -76,35 +76,6 @@ def get_classification_report(y_pred, y_true) -> dict:
     )
 
 
-def plot_confusion_matrix(y_pred, y_true, title):
-    """Plot a confusion matrix comparing predicted vs. true labels.
-
-    Parameters:
-        y_pred (array-like): Predicted binary labels.
-        y_true (array-like): Ground-truth binary labels.
-        title (str): Title to display on the plot.
-
-    Note:
-        Not yet implemented.
-    """
-    ...
-
-
-def get_roc_auc(model, threshold, X_test, y_test):
-    """Compute the ROC-AUC score for a fitted model on a held-out test set.
-
-    Parameters:
-        model: A fitted model exposing a `predict_proba` method.
-        threshold (float): Decision threshold, if needed for downstream metrics.
-        X_test (pd.DataFrame or np.ndarray): Test feature matrix.
-        y_test (array-like): Ground-truth labels for the test set.
-
-    Note:
-        Not yet implemented.
-    """
-    ...
-
-
 def get_risk_level(probability, threshold):
     """Return a risk label based on a probability and threshold.
 
