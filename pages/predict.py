@@ -16,7 +16,6 @@ if 'role' not in st.session_state:
     st.session_state.role = 'clinical'
 
 # CLINICAL VIEW 
-
 if st.session_state.role == 'clinical':
 
     with st.form("nf1_prediction_form"):
@@ -118,10 +117,12 @@ if st.session_state.role == 'clinical':
             st.divider()
   
             model = pipeline.named_steps['model']
-    
             # X_tr as background data (standard ml approach)
             shap_vals = get_shap_values(model, patient_data, "Linear", scaler, X_te)
-            fig = plot_waterfall(shap_values=shap_vals, title="Symptoms relevance", clinical_mode=True)
+
+            fig = plot_waterfall(shap_values=shap_vals, 
+                                 title="Symptoms relevance", 
+                                 clinical_mode=True)
             st.pyplot(fig)
             st.divider()
 
