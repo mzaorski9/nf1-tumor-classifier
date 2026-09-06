@@ -18,8 +18,8 @@ The app trains and compares three classifiers — Logistic Regression, Random Fo
 
 ## Demo
 
-![Application screenshots](screenshots/pred_example.png.png)
-![Application screenshots](screenshots/research_cv_png.png)
+![Application screenshots](screenshots/pred_example.png)
+![Application screenshots](screenshots/research_cv_example.png)
 
 
 ## Modeling notes
