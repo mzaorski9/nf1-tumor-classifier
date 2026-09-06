@@ -55,8 +55,8 @@ Python, scikit-learn, XGBoost, SHAP, Streamlit, pandas, matplotlib.
 
 ## Try it
 
-The app is live on HuggingFace Spaces — no installation needed, just open the Space and use it in your browser.
-Live app: [huggingface.co/spaces/your-username/nf1-classifier](https://huggingface.co/spaces/your-username/nf1-classifier)
+The app is live on Streamlit Cloud — no installation needed, just open the link and use it in your browser.
+Live app: [https://nf1-tumor-classifier.streamlit.app/](https://nf1-tumor-classifier.streamlit.app/)
 
 ## Running locally (optional)
 
